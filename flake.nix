@@ -695,7 +695,6 @@
       bbrModule =
         { config, pkgs, lib, ... }:
         let
-          cfg = config.networking.bbr_dev;
           kernel = config.boot.kernelPackages.kernel;
           isClang = kernel.stdenv.cc.isClang or false;
 
@@ -836,39 +835,30 @@
           };
         in
         {
-          options.networking.bbr_dev = {
-            enable = lib.mkEnableOption "BBR development modules";
-            variants = lib.mkOption {
-              type = lib.types.listOf (lib.types.enum [
-                "classic" "turbo" "hyper" "jp" "ultra" "insane" "absurd" "brutal"
-              ]);
-              default = [ "classic" "turbo" "hyper" "jp" "ultra" "insane" "absurd" "brutal" ];
-            };
-          };
+          # No options declared - unconditionally build and load all BBR variants.
+          # The enable/variants option machinery lives in your real config;
+          # here we just want everything in the build closure.
+          boot.extraModulePackages = [
+            bbr_classic_mod
+            bbr_turbo
+            bbr_hyper
+            bbr_jp
+            bbr_ultra
+            bbr_insane
+            bbr_absurd
+            tcp_brutal
+          ];
 
-          config = lib.mkIf cfg.enable {
-            boot.extraModulePackages =
-              lib.optionals (builtins.elem "classic" cfg.variants) [ bbr_classic_mod ]
-              ++ lib.optionals (builtins.elem "turbo" cfg.variants) [ bbr_turbo ]
-              ++ lib.optionals (builtins.elem "hyper" cfg.variants) [ bbr_hyper ]
-              ++ lib.optionals (builtins.elem "jp" cfg.variants) [ bbr_jp ]
-              ++ lib.optionals (builtins.elem "ultra" cfg.variants) [ bbr_ultra ]
-              ++ lib.optionals (builtins.elem "insane" cfg.variants) [ bbr_insane ]
-              ++ lib.optionals (builtins.elem "absurd" cfg.variants) [ bbr_absurd ]
-              ++ lib.optionals (builtins.elem "brutal" cfg.variants) [ tcp_brutal ];
-
-            boot.kernelModules =
-              lib.optionals (builtins.elem "classic" cfg.variants) [ "tcp_bbr_classic" ]
-              ++ lib.optionals (builtins.elem "turbo" cfg.variants) [ "tcp_bbr_turbo" ]
-              ++ lib.optionals (builtins.elem "hyper" cfg.variants) [ "tcp_bbr_hyper" ]
-              ++ lib.optionals (builtins.elem "jp" cfg.variants) [ "tcp_bbr_jp" ]
-              ++ lib.optionals (builtins.elem "ultra" cfg.variants) [ "tcp_bbr_ultra" ]
-              ++ lib.optionals (builtins.elem "insane" cfg.variants) [ "tcp_bbr_insane" ]
-              ++ lib.optionals (builtins.elem "absurd" cfg.variants) [ "tcp_bbr_absurd" ]
-              ++ lib.optionals (builtins.elem "brutal" cfg.variants) [ "tcp_brutal" ];
-
-            networking.bbr_dev.enable = true;
-          };
+          boot.kernelModules = [
+            "tcp_bbr_classic"
+            "tcp_bbr_turbo"
+            "tcp_bbr_hyper"
+            "tcp_bbr_jp"
+            "tcp_bbr_ultra"
+            "tcp_bbr_insane"
+            "tcp_bbr_absurd"
+            "tcp_brutal"
+          ];
         };
 
     in
