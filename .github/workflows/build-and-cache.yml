@@ -28,7 +28,7 @@ jobs:
           name: cmspam
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           # EXCLUDE: linux-cachyos and anything with "fonts" in the name
-          pushFilter: '(?!(.*linux-cachyos.*|.*fonts.*))'
+          pushFilter: '(?!(^linux-cachyos|^fonts))'
 
       - name: Update flake inputs
         run: nix flake update --accept-flake-config
@@ -63,7 +63,7 @@ jobs:
           name: cmspam
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
           # EXCLUDE: linux-cachyos and anything with "fonts" in the name
-          pushFilter: '(?!(.*linux-cachyos.*|.*fonts.*))'
+          pushFilter: '(?!(^linux-cachyos|^fonts))'
 
       - name: Update flake inputs
         run: nix flake update --accept-flake-config
