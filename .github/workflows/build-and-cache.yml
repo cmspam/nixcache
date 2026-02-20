@@ -35,6 +35,7 @@ jobs:
       - name: Build zephyrus system (full closure)
         run: |
           nix build .#zephyrus-system \
+            --accept-flake-config \
             --print-build-logs \
             --keep-going \
             --max-jobs auto \
@@ -67,6 +68,7 @@ jobs:
       - name: Build gamepc system (full closure)
         run: |
           nix build .#gamepc-system \
+            --accept-flake-config \
             --print-build-logs \
             --keep-going \
             --max-jobs auto \
