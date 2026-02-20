@@ -119,256 +119,256 @@
       # UUIDs, disk labels, user names, key files, etc.).
       # --------------------------------------------------------
 
-      zephyrusModules = [
-        nixos-hardware.nixosModules.asus-zephyrus-ga402x-nvidia
+      zephyrusModules =
+        [
+          nixos-hardware.nixosModules.asus-zephyrus-ga402x-nvidia
 
-        # --- Fake hardware configuration (no real UUIDs) ------
-        (
-          { lib, modulesPath, ... }:
-          {
-            imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
-            boot.initrd.availableKernelModules = [
-              "nvme"
-              "xhci_pci"
-              "thunderbolt"
-              "usb_storage"
-              "usbhid"
-              "sd_mod"
-              "rtsx_pci_sdmmc"
-            ];
-            boot.kernelModules = [ "kvm-amd" ];
-            boot.extraModulePackages = [ ];
-            # Fake root fs so NixOS config evaluates cleanly
-            fileSystems."/" = {
-              device = "/dev/sda1";
-              fsType = "ext4";
-            };
-            fileSystems."/efi" = {
-              device = "/dev/sda2";
-              fsType = "vfat";
-            };
-            swapDevices = [ ];
-            nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-            hardware.cpu.amd.updateMicrocode = lib.mkDefault true;
-          }
-        )
+          # --- Fake hardware configuration (no real UUIDs) ------
+          (
+            { lib, modulesPath, ... }:
+            {
+              imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
+              boot.initrd.availableKernelModules = [
+                "nvme"
+                "xhci_pci"
+                "thunderbolt"
+                "usb_storage"
+                "usbhid"
+                "sd_mod"
+                "rtsx_pci_sdmmc"
+              ];
+              boot.kernelModules = [ "kvm-amd" ];
+              boot.extraModulePackages = [ ];
+              # Fake root fs so NixOS config evaluates cleanly
+              fileSystems."/" = {
+                device = "/dev/sda1";
+                fsType = "ext4";
+              };
+              fileSystems."/efi" = {
+                device = "/dev/sda2";
+                fsType = "vfat";
+              };
+              swapDevices = [ ];
+              nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+              hardware.cpu.amd.updateMicrocode = lib.mkDefault true;
+            }
+          )
 
-        # --- Boot (Zephyrus) -----------------------------------
-        (
-          { config, pkgs, lib, ... }:
-          {
-            boot = {
-              loader.systemd-boot.enable = lib.mkForce false;
-              loader.efi.canTouchEfiVariables = true;
-              loader.efi.efiSysMountPoint = "/efi";
+          # --- Boot (Zephyrus) -----------------------------------
+          (
+            { config, pkgs, lib, ... }:
+            {
+              boot = {
+                loader.systemd-boot.enable = lib.mkForce false;
+                loader.efi.canTouchEfiVariables = true;
+                loader.efi.efiSysMountPoint = "/efi";
 
-              lanzaboote = {
-                enable = true;
-                pkiBundle = "/var/lib/sbctl";
+                lanzaboote = {
+                  enable = true;
+                  pkiBundle = "/var/lib/sbctl";
+                };
+
+                # CachyOS zen4 LTO kernel (the expensive compile target)
+                kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-zen4;
+
+                kernelParams = [
+                  "i8042.reset=1"
+                  "i8042.nomux=1"
+                  "asus_wmi.kbd_rgb_mode=0"
+                  "amdgpu.gpu_recovery=1"
+                  "amdgpu.dcdebugmask=0x10"
+                ];
+
+                initrd.availableKernelModules = [
+                  "atkbd"
+                  "i8042"
+                ];
+                initrd.kernelModules = [
+                  "atkbd"
+                  "i8042"
+                ];
+
+                initrd.systemd.enable = true;
+                supportedFilesystems = [ "fuse" ];
               };
 
-              # CachyOS zen4 LTO kernel (the expensive compile target)
-              kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-zen4;
+              environment.systemPackages = [ pkgs.sbctl ];
+            }
+          )
 
-              kernelParams = [
-                "i8042.reset=1"
-                "i8042.nomux=1"
-                "asus_wmi.kbd_rgb_mode=0"
-                "amdgpu.gpu_recovery=1"
-                "amdgpu.dcdebugmask=0x10"
-              ];
+          # --- Hardware (Zephyrus) - NVIDIA + ASUS services ------
+          (
+            { config, lib, pkgs, ... }:
+            {
+              services.fstrim.enable = true;
+              hardware.bluetooth.enable = true;
+              hardware.bluetooth.powerOnBoot = true;
+              services.hardware.bolt.enable = true;
 
-              initrd.availableKernelModules = [
-                "atkbd"
-                "i8042"
-              ];
-              initrd.kernelModules = [
-                "atkbd"
-                "i8042"
-              ];
-
-              initrd.systemd.enable = true;
-              supportedFilesystems = [ "fuse" ];
-            };
-
-            environment.systemPackages = [ pkgs.sbctl ];
-          }
-        )
-
-        # --- Hardware (Zephyrus) - NVIDIA + ASUS services ------
-        (
-          { config, lib, pkgs, ... }:
-          {
-            services.fstrim.enable = true;
-            hardware.bluetooth.enable = true;
-            hardware.bluetooth.powerOnBoot = true;
-            services.hardware.bolt.enable = true;
-
-            services.xserver.videoDrivers = [ "nvidia" ];
-            hardware.nvidia = {
-              open = true;
-              nvidiaSettings = true;
-              package =
-                let
-                  base = config.boot.kernelPackages.nvidiaPackages.latest;
-                  cachyos-nvidia-patch = pkgs.fetchpatch {
-                    url = "https://raw.githubusercontent.com/CachyOS/CachyOS-PKGBUILDS/master/nvidia/nvidia-utils/kernel-6.19.patch";
-                    sha256 = "sha256-YuJjSUXE6jYSuZySYGnWSNG5sfVei7vvxDcHx3K+IN4=";
+              services.xserver.videoDrivers = [ "nvidia" ];
+              hardware.nvidia = {
+                open = true;
+                nvidiaSettings = true;
+                package =
+                  let
+                    base = config.boot.kernelPackages.nvidiaPackages.latest;
+                    cachyos-nvidia-patch = pkgs.fetchpatch {
+                      url = "https://raw.githubusercontent.com/CachyOS/CachyOS-PKGBUILDS/master/nvidia/nvidia-utils/kernel-6.19.patch";
+                      sha256 = "sha256-YuJjSUXE6jYSuZySYGnWSNG5sfVei7vvxDcHx3K+IN4=";
+                    };
+                    driverAttr = if config.hardware.nvidia.open then "open" else "bin";
+                  in
+                  base
+                  // {
+                    ${driverAttr} = base.${driverAttr}.overrideAttrs (oldAttrs: {
+                      patches = (oldAttrs.patches or [ ]) ++ [ cachyos-nvidia-patch ];
+                    });
                   };
-                  driverAttr = if config.hardware.nvidia.open then "open" else "bin";
-                in
-                base
-                // {
-                  ${driverAttr} = base.${driverAttr}.overrideAttrs (oldAttrs: {
-                    patches = (oldAttrs.patches or [ ]) ++ [ cachyos-nvidia-patch ];
-                  });
-                };
-              powerManagement.enable = true;
-              powerManagement.finegrained = true;
-              modesetting.enable = true;
-              dynamicBoost.enable = lib.mkForce true;
-            };
-
-            services.supergfxd.enable = true;
-            services.asusd.enable = true;
-
-            environment.systemPackages =
-              let
-                nvidia-run = pkgs.writeShellScriptBin "nvidia-run" ''
-                  export __NV_PRIME_RENDER_OFFLOAD=1
-                  export __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0
-                  export __GLX_VENDOR_LIBRARY_NAME=nvidia
-                  export __VK_LAYER_NV_optimus=NVIDIA_only
-                  exec "$@"
-                '';
-                amd-run = pkgs.writeShellScriptBin "amd-run" ''
-                  export DRI_PRIME=1
-                  exec "$@"
-                '';
-              in
-              with pkgs;
-              [
-                nvidia-run
-                amd-run
-                supergfxctl
-                supergfxctl-plasmoid
-                asusctl
-              ];
-
-            boot.kernel.sysctl."kernel.sysrq" = 1;
-          }
-        )
-
-        # --- Profiles (shared with gamepc) --------------------
-        zephyrusProfileModules
-
-        # --- BBR kernel modules (built against zen4 kernel) ---
-        bbrModule
-
-        # --- Hostname ---
-        { networking.hostName = "zephyrus"; }
-      ];
-
-      gamePCModules = [
-        # --- Fake hardware configuration ----------------------
-        (
-          { lib, modulesPath, ... }:
-          {
-            imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
-            boot.initrd.availableKernelModules = [
-              "nvme"
-              "xhci_pci"
-              "ahci"
-              "usbhid"
-              "usb_storage"
-              "sd_mod"
-            ];
-            boot.extraModulePackages = [ ];
-            fileSystems."/" = {
-              device = "/dev/sda1";
-              fsType = "ext4";
-            };
-            fileSystems."/efi" = {
-              device = "/dev/sda2";
-              fsType = "vfat";
-            };
-            swapDevices = [ ];
-            nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-            hardware.cpu.amd.updateMicrocode = lib.mkDefault true;
-          }
-        )
-
-        # --- Boot (gamepc) ------------------------------------
-        (
-          { config, pkgs, lib, ... }:
-          {
-            boot = {
-              plymouth.enable = true;
-              loader.systemd-boot.enable = lib.mkForce false;
-              loader.systemd-boot.consoleMode = "max";
-              loader.efi.canTouchEfiVariables = true;
-              loader.efi.efiSysMountPoint = "/efi";
-
-              lanzaboote = {
-                enable = true;
-                pkiBundle = "/var/lib/sbctl";
+                powerManagement.enable = true;
+                powerManagement.finegrained = true;
+                modesetting.enable = true;
+                dynamicBoost.enable = lib.mkForce true;
               };
 
-              # CachyOS x86_64-v3 LTO kernel
-              kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
-              kernelParams = [ "quiet" ];
-              initrd.systemd.enable = true;
-              supportedFilesystems = [ "fuse" ];
-              consoleLogLevel = 0;
-            };
-          }
-        )
+              services.supergfxd.enable = true;
+              services.asusd.enable = true;
 
-        # --- Hardware (gamepc) - NVIDIA RTX 4090 --------------
-        (
-          { config, lib, pkgs, ... }:
-          {
-            services.fstrim.enable = true;
-            hardware.bluetooth.enable = true;
-            hardware.bluetooth.powerOnBoot = true;
-            hardware.xone.enable = true;
-
-            services.xserver.videoDrivers = [ "nvidia" ];
-            hardware.nvidia = {
-              open = true;
-              nvidiaSettings = true;
-              package =
+              environment.systemPackages =
                 let
-                  base = config.boot.kernelPackages.nvidiaPackages.latest;
-                  cachyos-nvidia-patch = pkgs.fetchpatch {
-                    url = "https://raw.githubusercontent.com/CachyOS/CachyOS-PKGBUILDS/master/nvidia/nvidia-utils/kernel-6.19.patch";
-                    sha256 = "sha256-YuJjSUXE6jYSuZySYGnWSNG5sfVei7vvxDcHx3K+IN4=";
-                  };
-                  driverAttr = if config.hardware.nvidia.open then "open" else "bin";
+                  nvidia-run = pkgs.writeShellScriptBin "nvidia-run" ''
+                    export __NV_PRIME_RENDER_OFFLOAD=1
+                    export __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0
+                    export __GLX_VENDOR_LIBRARY_NAME=nvidia
+                    export __VK_LAYER_NV_optimus=NVIDIA_only
+                    exec "$@"
+                  '';
+                  amd-run = pkgs.writeShellScriptBin "amd-run" ''
+                    export DRI_PRIME=1
+                    exec "$@"
+                  '';
                 in
-                base
-                // {
-                  ${driverAttr} = base.${driverAttr}.overrideAttrs (oldAttrs: {
-                    patches = (oldAttrs.patches or [ ]) ++ [ cachyos-nvidia-patch ];
-                  });
+                with pkgs;
+                [
+                  nvidia-run
+                  amd-run
+                  supergfxctl
+                  supergfxctl-plasmoid
+                  asusctl
+                ];
+
+              boot.kernel.sysctl."kernel.sysrq" = 1;
+            }
+          )
+
+          # --- BBR kernel modules (built against zen4 kernel) ---
+          bbrModule
+
+          # --- Hostname ---
+          { networking.hostName = "zephyrus"; }
+        ]
+        # --- Profiles (concatenated, not nested) ---------------
+        ++ zephyrusProfileModules;
+
+      gamePCModules =
+        [
+          # --- Fake hardware configuration ----------------------
+          (
+            { lib, modulesPath, ... }:
+            {
+              imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
+              boot.initrd.availableKernelModules = [
+                "nvme"
+                "xhci_pci"
+                "ahci"
+                "usbhid"
+                "usb_storage"
+                "sd_mod"
+              ];
+              boot.extraModulePackages = [ ];
+              fileSystems."/" = {
+                device = "/dev/sda1";
+                fsType = "ext4";
+              };
+              fileSystems."/efi" = {
+                device = "/dev/sda2";
+                fsType = "vfat";
+              };
+              swapDevices = [ ];
+              nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+              hardware.cpu.amd.updateMicrocode = lib.mkDefault true;
+            }
+          )
+
+          # --- Boot (gamepc) ------------------------------------
+          (
+            { config, pkgs, lib, ... }:
+            {
+              boot = {
+                plymouth.enable = true;
+                loader.systemd-boot.enable = lib.mkForce false;
+                loader.systemd-boot.consoleMode = "max";
+                loader.efi.canTouchEfiVariables = true;
+                loader.efi.efiSysMountPoint = "/efi";
+
+                lanzaboote = {
+                  enable = true;
+                  pkiBundle = "/var/lib/sbctl";
                 };
-              powerManagement.enable = true;
-              modesetting.enable = true;
-            };
 
-            boot.kernel.sysctl."kernel.sysrq" = 1;
-          }
-        )
+                # CachyOS x86_64-v3 LTO kernel
+                kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
+                kernelParams = [ "quiet" ];
+                initrd.systemd.enable = true;
+                supportedFilesystems = [ "fuse" ];
+                consoleLogLevel = 0;
+              };
+            }
+          )
 
-        # --- Profiles (shared with zephyrus except touchpad) --
-        gamePCProfileModules
+          # --- Hardware (gamepc) - NVIDIA RTX 4090 --------------
+          (
+            { config, lib, pkgs, ... }:
+            {
+              services.fstrim.enable = true;
+              hardware.bluetooth.enable = true;
+              hardware.bluetooth.powerOnBoot = true;
+              hardware.xone.enable = true;
 
-        # --- BBR kernel modules (built against x86_64-v3 kernel) ---
-        bbrModule
+              services.xserver.videoDrivers = [ "nvidia" ];
+              hardware.nvidia = {
+                open = true;
+                nvidiaSettings = true;
+                package =
+                  let
+                    base = config.boot.kernelPackages.nvidiaPackages.latest;
+                    cachyos-nvidia-patch = pkgs.fetchpatch {
+                      url = "https://raw.githubusercontent.com/CachyOS/CachyOS-PKGBUILDS/master/nvidia/nvidia-utils/kernel-6.19.patch";
+                      sha256 = "sha256-YuJjSUXE6jYSuZySYGnWSNG5sfVei7vvxDcHx3K+IN4=";
+                    };
+                    driverAttr = if config.hardware.nvidia.open then "open" else "bin";
+                  in
+                  base
+                  // {
+                    ${driverAttr} = base.${driverAttr}.overrideAttrs (oldAttrs: {
+                      patches = (oldAttrs.patches or [ ]) ++ [ cachyos-nvidia-patch ];
+                    });
+                  };
+                powerManagement.enable = true;
+                modesetting.enable = true;
+              };
 
-        # --- Hostname ---
-        { networking.hostName = "gamepc"; }
-      ];
+              boot.kernel.sysctl."kernel.sysrq" = 1;
+            }
+          )
+
+          # --- BBR kernel modules (built against x86_64-v3 kernel) ---
+          bbrModule
+
+          # --- Hostname ---
+          { networking.hostName = "gamepc"; }
+        ]
+        # --- Profiles (concatenated, not nested) ---------------
+        ++ gamePCProfileModules;
 
       # --------------------------------------------------------
       # Profiles - shared between both hosts
