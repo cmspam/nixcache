@@ -38,8 +38,8 @@ jobs:
             --accept-flake-config \
             --print-build-logs \
             --keep-going \
-            --max-jobs auto \
-            --cores 0
+            --max-jobs 1 \
+            --cores 2
 
   build-gamepc:
     name: "Build gamepc (x86_64-v3 LTO kernel + BBR modules + NVIDIA)"
@@ -71,5 +71,5 @@ jobs:
             --accept-flake-config \
             --print-build-logs \
             --keep-going \
-            --max-jobs auto \
-            --cores 0
+            --max-jobs 1 \
+            --cores 2
