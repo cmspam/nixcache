@@ -32,6 +32,8 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.11";
+    nixpkgs-master.url = "github:nixos/nixpkgs/master";
+
     nixos-hardware.url = "github:nixos/nixos-hardware";
 
     lanzaboote = {
@@ -66,6 +68,7 @@
       self,
       nixpkgs,
       nixpkgs-stable,
+      nixpkgs-master,
       nixos-hardware,
       lanzaboote,
       jovian,
@@ -82,13 +85,17 @@
         inherit system;
         config.allowUnfree = true;
       };
+     pkgs-master = import nixpkgs-master {
+        inherit system;
+        config.allowUnfree = true;
+      };
 
       # Helper: build a NixOS system with the CachyOS kernel overlay + qemu overlay applied
       mkSystem =
         modules:
         nixpkgs.lib.nixosSystem {
           inherit system;
-          specialArgs = { inherit inputs pkgs-stable; };
+          specialArgs = { inherit inputs pkgs-stable pkgs-master; };
           modules =
             [
               lanzaboote.nixosModules.lanzaboote
@@ -528,7 +535,7 @@
               autoStart = true;
               capSysAdmin = true;
               openFirewall = true;
-              package = pkgs.sunshine.override {
+              package = pkgs-master.sunshine.override {
                 cudaSupport = true;
                 cudaPackages = pkgs.cudaPackages;
               };
