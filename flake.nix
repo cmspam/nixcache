@@ -34,7 +34,7 @@
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.11";
     nixpkgs-master.url = "github:nixos/nixpkgs/master";
 
-    nixos-hardware.url = "github:cmspam/nixos-hardware/patch-1";
+    nixos-hardware.url = "github:cmspam/nixos-hardware/patch-2";
 
     lanzaboote = {
       url = "github:nix-community/lanzaboote";
