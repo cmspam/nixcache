@@ -228,6 +228,18 @@
                       patches = (oldAttrs.patches or [ ]) ++ [ cachyos-nvidia-patch ];
                     });
                   };
+                 modesetting.enable = true;
+                 nvidiaSettings = mkDefault true;
+
+                 prime = {
+                   offload = {
+                     enable = mkDefault true;
+                     enableOffloadCmd = mkDefault true;
+                   };
+                   amdgpuBusId = "PCI:101:0:0";
+                   nvidiaBusId = "PCI:1:0:0";
+                 };
+
                 powerManagement.enable = true;
                 powerManagement.finegrained = true;
                 modesetting.enable = true;
