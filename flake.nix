@@ -228,9 +228,6 @@
                       patches = (oldAttrs.patches or [ ]) ++ [ cachyos-nvidia-patch ];
                     });
                   };
-                 modesetting.enable = true;
-                 nvidiaSettings = mkDefault true;
-
                  prime = {
                    offload = {
                      enable = mkDefault true;
