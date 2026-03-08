@@ -34,6 +34,7 @@
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.11";
     nixpkgs-master.url = "github:nixos/nixpkgs/master";
 
+    nixos-hardware.url = "github:nixos/nixos-hardware";
 
     lanzaboote = {
       url = "github:nix-community/lanzaboote";
@@ -68,6 +69,7 @@
       nixpkgs,
       nixpkgs-stable,
       nixpkgs-master,
+      nixos-hardware,
       lanzaboote,
       jovian,
       nix-cachyos-kernel,
@@ -126,6 +128,7 @@
 
       zephyrusModules =
         [
+          nixos-hardware.nixosModules.asus-zephyrus-ga402x-nvidia
 
           # --- Fake hardware configuration (no real UUIDs) ------
           (
@@ -228,15 +231,6 @@
                       patches = (oldAttrs.patches or [ ]) ++ [ cachyos-nvidia-patch ];
                     });
                   };
-                 prime = {
-                   offload = {
-                     enable = mkDefault true;
-                     enableOffloadCmd = mkDefault true;
-                   };
-                   amdgpuBusId = "PCI:101:0:0";
-                   nvidiaBusId = "PCI:1:0:0";
-                 };
-
                 powerManagement.enable = true;
                 powerManagement.finegrained = true;
                 modesetting.enable = true;
@@ -244,7 +238,6 @@
               };
 
               services.supergfxd.enable = true;
-              services.asusd.enable = true;
 
               environment.systemPackages =
                 let
