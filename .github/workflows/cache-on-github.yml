@@ -1,0 +1,201 @@
+name: "Build and Cache NixOS Systems (GitHub Releases)"
+
+on:
+  pull_request:
+  push:
+  schedule:
+    - cron: '0 */8 * * *'
+
+jobs:
+  build-zephyrus:
+    name: "Build zephyrus → GitHub Releases cache"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            substituters = https://cache.nixos.org https://attic.xuyh0120.win/lantian https://jovian-experiments.cachix.org https://cmspam.cachix.org https://lanzaboote.cachix.org https://nix-community.cachix.org https://cuda-maintainers.cachix.org
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc= jovian-experiments.cachix.org-1:TyDJIG9AdB5uEAHVAVCjXU1qKBZkCIvqj4rDRz5/sfY= cmspam.cachix.org-1:Xd8Ff8s65DuMHtLf+kpSsdBB62gokpj5PQWA74NU++s= lanzaboote.cachix.org-1:Nt9//zGmqkg1k5iu+B3bkj3OmHKjSw9pvf3faffLLNk= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=
+
+      - name: Update flake inputs
+        run: nix flake update --accept-flake-config
+
+      - name: Build zephyrus system (full closure)
+        run: |
+          nix build .#zephyrus-system \
+            --accept-flake-config \
+            --print-build-logs \
+            --keep-going \
+            --max-jobs 1 \
+            --cores 2
+
+      - name: Find locally-built paths (not available in any upstream cache)
+        run: |
+          SUBSTITUTERS=(
+            https://cache.nixos.org
+            https://attic.xuyh0120.win/lantian
+            https://jovian-experiments.cachix.org
+            https://cmspam.cachix.org
+            https://lanzaboote.cachix.org
+            https://nix-community.cachix.org
+            https://cuda-maintainers.cachix.org
+          )
+
+          echo "Getting full closure..."
+          nix path-info --recursive .#zephyrus-system > /tmp/all-paths.txt
+          echo "Total paths in closure: $(wc -l < /tmp/all-paths.txt)"
+
+          # Build a combined set of paths available in ANY upstream cache
+          > /tmp/cached-paths.txt
+          for substituter in "${SUBSTITUTERS[@]}"; do
+            echo "Checking $substituter ..."
+            nix path-info --recursive --store "$substituter" .#zephyrus-system \
+              2>/dev/null >> /tmp/cached-paths.txt || true
+          done
+          sort -u /tmp/cached-paths.txt -o /tmp/cached-paths.txt
+
+          # Paths in our closure but not in any upstream = what we built locally
+          comm -23 \
+            <(sort /tmp/all-paths.txt) \
+            /tmp/cached-paths.txt \
+            > /tmp/local-paths.txt
+
+          echo "Paths to upload: $(wc -l < /tmp/local-paths.txt)"
+          cat /tmp/local-paths.txt
+
+      - name: Export local paths to NAR cache format
+        run: |
+          mkdir -p /tmp/cache
+
+          # nix copy handles narinfo + nar generation correctly
+          if [ -s /tmp/local-paths.txt ]; then
+            xargs nix copy \
+              --to "file:///tmp/cache?compression=xz&parallel-compression=true" \
+              --no-check-sigs \
+              < /tmp/local-paths.txt
+          else
+            echo "Nothing to upload, all paths were available upstream."
+          fi
+
+          # Always write nix-cache-info (needed for nix to recognise this as a cache)
+          cat > /tmp/cache/nix-cache-info <<EOF
+          StoreDir: /nix/store
+          WantMassQuery: 1
+          Priority: 40
+          EOF
+
+          echo "Files to upload: $(ls /tmp/cache | wc -l)"
+
+      - name: Upload to GitHub Release
+        if: hashFiles('/tmp/local-paths.txt') != '' 
+        run: |
+          # Create the release if it doesn't exist yet, then upload / overwrite
+          gh release create zephyrus-nix-cache \
+            --title "Nix Cache: zephyrus" \
+            --notes "Auto-generated Nix binary cache for the zephyrus system closure. Do not edit manually." \
+            2>/dev/null || true
+
+          gh release upload zephyrus-nix-cache /tmp/cache/* --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-gamepc:
+    name: "Build gamepc → GitHub Releases cache"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            substituters = https://cache.nixos.org https://attic.xuyh0120.win/lantian https://jovian-experiments.cachix.org https://cmspam.cachix.org https://lanzaboote.cachix.org https://nix-community.cachix.org https://cuda-maintainers.cachix.org
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc= jovian-experiments.cachix.org-1:TyDJIG9AdB5uEAHVAVCjXU1qKBZkCIvqj4rDRz5/sfY= cmspam.cachix.org-1:Xd8Ff8s65DuMHtLf+kpSsdBB62gokpj5PQWA74NU++s= lanzaboote.cachix.org-1:Nt9//zGmqkg1k5iu+B3bkj3OmHKjSw9pvf3faffLLNk= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=
+
+      - name: Update flake inputs
+        run: nix flake update --accept-flake-config
+
+      - name: Build gamepc system (full closure)
+        run: |
+          nix build .#gamepc-system \
+            --accept-flake-config \
+            --print-build-logs \
+            --keep-going \
+            --max-jobs 1 \
+            --cores 2
+
+      - name: Find locally-built paths (not available in any upstream cache)
+        run: |
+          SUBSTITUTERS=(
+            https://cache.nixos.org
+            https://attic.xuyh0120.win/lantian
+            https://jovian-experiments.cachix.org
+            https://cmspam.cachix.org
+            https://lanzaboote.cachix.org
+            https://nix-community.cachix.org
+            https://cuda-maintainers.cachix.org
+          )
+
+          echo "Getting full closure..."
+          nix path-info --recursive .#gamepc-system > /tmp/all-paths.txt
+          echo "Total paths in closure: $(wc -l < /tmp/all-paths.txt)"
+
+          > /tmp/cached-paths.txt
+          for substituter in "${SUBSTITUTERS[@]}"; do
+            echo "Checking $substituter ..."
+            nix path-info --recursive --store "$substituter" .#gamepc-system \
+              2>/dev/null >> /tmp/cached-paths.txt || true
+          done
+          sort -u /tmp/cached-paths.txt -o /tmp/cached-paths.txt
+
+          comm -23 \
+            <(sort /tmp/all-paths.txt) \
+            /tmp/cached-paths.txt \
+            > /tmp/local-paths.txt
+
+          echo "Paths to upload: $(wc -l < /tmp/local-paths.txt)"
+          cat /tmp/local-paths.txt
+
+      - name: Export local paths to NAR cache format
+        run: |
+          mkdir -p /tmp/cache
+
+          if [ -s /tmp/local-paths.txt ]; then
+            xargs nix copy \
+              --to "file:///tmp/cache?compression=xz&parallel-compression=true" \
+              --no-check-sigs \
+              < /tmp/local-paths.txt
+          else
+            echo "Nothing to upload, all paths were available upstream."
+          fi
+
+          cat > /tmp/cache/nix-cache-info <<EOF
+          StoreDir: /nix/store
+          WantMassQuery: 1
+          Priority: 40
+          EOF
+
+          echo "Files to upload: $(ls /tmp/cache | wc -l)"
+
+      - name: Upload to GitHub Release
+        if: hashFiles('/tmp/local-paths.txt') != ''
+        run: |
+          gh release create gamepc-nix-cache \
+            --title "Nix Cache: gamepc" \
+            --notes "Auto-generated Nix binary cache for the gamepc system closure. Do not edit manually." \
+            2>/dev/null || true
+
+          gh release upload gamepc-nix-cache /tmp/cache/* --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
